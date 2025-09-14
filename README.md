@@ -1,7 +1,7 @@
 # Mood Palette Generator 
 
 > A React + Firebase web app that generates color palettes based on moods.  
-> **Status:** Ongoing project — new features and improvements coming soon!
+> **Status:** Ongoing project, new features and improvements coming soon!
 
 Pick a mood, get a palette, and save your favorites.  
 
