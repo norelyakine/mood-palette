@@ -9,7 +9,6 @@ export default function Login({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
 
   // Generate or fetch username from DB
-  // Generate or fetch username from DB
 const assignUsername = async (uid) => {
   const userRef = ref(rtdb, `users/${uid}/username`);
   const snapshot = await get(userRef);

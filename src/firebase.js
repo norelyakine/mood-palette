@@ -25,4 +25,4 @@ export const db = getFirestore(app);
 
 export const rtdb = getDatabase(app); 
 
-export const auth = getAuth(app); // <-- added
+export const auth = getAuth(app); 
