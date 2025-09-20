@@ -9,6 +9,8 @@ import {
 } from "../utils/colorUtils";
 import layoutTemplates from "../utils/layoutTemplates";
 import { HexColorPicker, HexColorInput } from "react-colorful";
+import { rtdb, auth } from "../firebase";
+import { ref, push, set } from "firebase/database";
 
 export default function HarmonyPalette() {
   const [palette, setPalette] = useState([]);
@@ -17,8 +19,7 @@ export default function HarmonyPalette() {
   const [activePicker, setActivePicker] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [hueMap, setHueMap] = useState(null);
-
-  // Refs to avoid stale state in key handlers
+  const [paletteKey, setPaletteKey] = useState(0);
   const lockedRef = useRef(locked);
   const paletteRef = useRef(palette);
   const hueMapRef = useRef(hueMap);
@@ -38,23 +39,23 @@ export default function HarmonyPalette() {
   };
 
   const generatePalette = useCallback(async () => {
-  const map = hueMapRef.current || (await fetchHueWheel());
-  if (!hueMapRef.current) setHueMap(map);
+            const map = hueMapRef.current || (await fetchHueWheel());
+            if (!hueMapRef.current) setHueMap(map);
 
-  const baseHue = Math.floor(Math.random() * 360);
-  const types = ["Analogous", "Complementary", "Triadic", "Split-Complementary"];
-  const harmonyType = types[Math.floor(Math.random() * types.length)];
-  const hueSet = generateHarmonySet(baseHue, harmonyType);
+            const baseHue = Math.floor(Math.random() * 360);
+            const types = ["Analogous", "Complementary", "Triadic", "Split-Complementary"];
+            const harmonyType = types[Math.floor(Math.random() * types.length)];
+            const hueSet = generateHarmonySet(baseHue, harmonyType);
 
-  const variants = Array(5)
-    .fill(0)
-    .map(() => ["bright", "soft", "deep", "muted"][Math.floor(Math.random() * 4)]);
+            const variants = Array(5)
+                .fill(0)
+                .map(() => ["bright", "soft", "deep", "muted"][Math.floor(Math.random() * 4)]);
 
-  const locks = lockedRef.current;
+            const locks = lockedRef.current;
 
-  const hexSet = hueSet.map((h, i) =>
-    locks[i] ? locks[i] : getNearestHueHex(h, map, variants[i])
-  );
+            const hexSet = hueSet.map((h, i) =>
+                locks[i] ? locks[i] : getNearestHueHex(h, map, variants[i])
+    );
 
   const hasLocks = Object.keys(locks).length > 0;
 
@@ -81,10 +82,30 @@ export default function HarmonyPalette() {
   }
 
   setPalette(nextPalette);
+  setPaletteKey((k) => k + 1);
+
   setMessage("");
   setActivePicker(null);
   setCopiedIndex(null);
 }, []);
+
+const savePalette = () => {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Log in to save.");
+    return;
+  }
+
+  const pRef = ref(rtdb, `users/${user.uid}/palettes`);
+  const newRef = push(pRef);
+
+  set(newRef, {
+    type: "harmony",
+    colors: palette.map((c) => c.color),
+    createdAt: Date.now(),
+  }).then(() => setMessage("Harmony palette saved, locked in perfect balance!"));
+    setTimeout(() => setMessage(""), 600); 
+};
 
 
   const toggleLock = (index) => {
@@ -157,8 +178,13 @@ export default function HarmonyPalette() {
   }, [generatePalette]);
 
   return (
-    <div className="p-6 relative">
-      <h1 className="text-2xl font-bold text-center mb-2">Harmony Mode</h1>
+    <div className="h-full px-6 relative">
+      <h1 className="text-2xl font-bold text-center mb-3 ">Harmony Mode</h1>
+        {message && (
+        <div className="fixed top-19 right-4 bg-amber-400 bg-opacity-55 text-orange-900 px-4 py-2 rounded shadow z-50">
+            {message}
+        </div>
+        )}
 
       {/* Controls row */}
       <div className="flex items-center justify-center gap-3 mb-4">
@@ -177,60 +203,76 @@ export default function HarmonyPalette() {
         >
           🔄
         </button>
+        <button
+            onClick={savePalette}
+            className="text-xl text-gray-700 hover:text-black transition"
+            title="Save Palette"
+        >
+            💾
+        </button>
       </div>
 
-      <div className="grid grid-cols-4 grid-rows-2 gap-2 w-full min-h-[400px]">
-        {palette.map((item, i) => (
-          <div
-            key={i}
-            onClick={(e) => {
-              e.stopPropagation();
-              setActivePicker(i);
+   
+
+      <div className="grid grid-cols-4 grid-rows-2 gap-2 w-full  h-[60vh]">
+       {palette.map((item, i) => {
+        const isLocked = !!locked[i];
+        return (
+            <div
+            key={`${paletteKey}-${i}`}
+            className={`rounded cursor-pointer relative group ${getGridClasses(item)} border border-white
+                ${!isLocked ? "opacity-0 animate-fade-in" : ""}`}
+            style={{
+                backgroundColor: item.color,
+                animationDelay: !isLocked ? `${i * 100}ms` : undefined,
+                animationFillMode: !isLocked ? "forwards" : undefined,
             }}
-            className={`rounded ${getGridClasses(item)} relative group cursor-pointer border border-white`}
-            style={{ backgroundColor: item.color }}
-          >
+            onClick={(e) => {
+                e.stopPropagation();
+                setActivePicker(i);
+            }}
+            >
             {/* copyable hex */}
             <span
-              onClick={(e) => {
+                onClick={(e) => {
                 e.stopPropagation();
                 handleCopy(item.color, i);
-              }}
-              className="absolute bottom-2 left-2 text-xs bg-black/50 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition cursor-pointer"
-              title="Click to copy"
+                }}
+                className="absolute bottom-2 left-2 text-xs bg-black/50 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                title="Click to copy"
             >
-              {copiedIndex === i ? "Copied!" : item.color}
+                {copiedIndex === i ? "Copied!" : item.color}
             </span>
 
             {/* tweak */}
             <span
-              onClick={(e) => {
+                onClick={(e) => {
                 e.stopPropagation();
                 tweakColor(i);
-              }}
-              className="absolute top-2 right-2 text-xs bg-white text-gray-800 px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition"
+                }}
+                className="absolute top-2 right-2 text-xs bg-white text-gray-800 px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition"
             >
-              Tweak
+                Tweak
             </span>
 
-            {/* lock, stays visible when locked */}
+            {/* lock */}
             <span
-              onClick={(e) => {
+                onClick={(e) => {
                 e.stopPropagation();
                 toggleLock(i);
-              }}
-              className={
+                }}
+                className={
                 `absolute top-2 left-2 text-xs bg-white text-gray-800 px-2 py-1 rounded shadow cursor-pointer transition ` +
-                (locked[i]
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100")
-              }
-              title={locked[i] ? "Unlock" : "Lock"}
+                (isLocked ? "opacity-100" : "opacity-0 group-hover:opacity-100")
+                }
+                title={isLocked ? "Unlock" : "Lock"}
             >
-              {locked[i] ? "🔒" : "🔓"}
+                {isLocked ? "🔒" : "🔓"}
             </span>
-          </div>
-        ))}
+            </div>
+        );
+        })}
+
 
         {activePicker != null && (
           <div
@@ -262,7 +304,9 @@ export default function HarmonyPalette() {
           </div>
         )}
       </div>
-
+   <p className="mt-3 text-center text-sm text-gray-500 italic">
+        Press <kbd className="px-1 py-0.5 bg-gray-200 rounded">Enter</kbd> to generate a new palette
+     </p>
       {message && <div className="mt-4 text-center text-green-600 italic">{message}</div>}
 
       <div className="mt-4 text-center text-sm text-gray-600 italic">

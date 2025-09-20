@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { rtdb } from "../firebase";
 import { ref, push, set } from "firebase/database";
 import { auth } from "../firebase";
+import {addPaletteToCollection} from "../firebaseSetUp";
 import layoutTemplates from "../utils/layoutTemplates";
 
-// 1. Define each mood by hue‐segment ranges, plus S/L bands for harmony
 const MOOD_CONFIG = {
   Calm: {
     hueSegments: [[160, 200], [200, 240], [120, 160]],
@@ -38,12 +38,10 @@ const MOOD_CONFIG = {
   },
 };
 
-// 2. Helpers
 const rand = (min, max) => min + Math.random() * (max - min);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const wrapHue = (h) => ((h % 360) + 360) % 360;
 
-// convert HSL(0–360,0–100,0–100) → HEX 
 const hslToHex = (h, s, l) => {
   s /= 100; l /= 100;
   const k = (n) => (n + h / 30) % 12;
@@ -54,7 +52,6 @@ const hslToHex = (h, s, l) => {
   return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
 };
 
-// 3. Generate 5 colors from a mood profile
 function generateMoodPaletteColors(mood) {
   const { hueSegments, satRange, lightRange } = MOOD_CONFIG[mood];
   const colors = [];
@@ -68,7 +65,6 @@ function generateMoodPaletteColors(mood) {
   return colors;
 }
 
-// 4. Layout clamp to 4×2
 const normalizeLayoutItem = (item) => {
   const maxCols = 4, maxRows = 2;
   let { colStart, rowStart, colSpan, rowSpan } = item;
@@ -82,7 +78,6 @@ const normalizeLayoutItem = (item) => {
 const getGridClasses = ({ colStart, rowStart, colSpan, rowSpan }) =>
   [`col-start-${colStart}`, `row-start-${rowStart}`, `col-span-${colSpan}`, `row-span-${rowSpan}`].join(" ");
 
-// 5. React component
 export default function MoodPalette() {
   const [selectedMood, setSelectedMood] = useState("Calm");
   const [currentPalette, setCurrentPalette] = useState([]);
@@ -106,10 +101,8 @@ export default function MoodPalette() {
     setPaletteKey((k) => k + 1);
   };
 
-  // initial + on mood change
   useEffect(generatePalette, [selectedMood]);
 
-  // Enter key
   useEffect(() => {
     const onKey = (e) => e.key === "Enter" && generatePalette();
     window.addEventListener("keydown", onKey);
@@ -122,35 +115,48 @@ export default function MoodPalette() {
     setTimeout(() => setMessage(""), 1500);
   };
 
-  const savePalette = () => {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("Log in to save.");
-      return;
-    }
-    const pRef = ref(rtdb, `users/${user.uid}/palettes`);
-    const newRef = push(pRef);
-    set(newRef, {
-      mood: selectedMood,
-      colors: currentPalette.map((c) => c.color),
-      createdAt: Date.now(),
-    }).then(() => setMessage("🎉 Saved!"));
-  };
+  const savePalette = async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Log in to save.");
+    return;
+  }
+
+  const pRef = ref(rtdb, `users/${user.uid}/palettes`);
+  const newRef = push(pRef);
+
+    await set(newRef, {
+    type: "mood",
+    mood: selectedMood,
+    colors: currentPalette.map((c) => c.color),
+    createdAt: Date.now(),
+  })
+
+
+  const collectionId = prompt("Save to which collection ID? (leave blank to skip)");
+  if (collectionId) {
+    await addPaletteToCollection(collectionId, newRef.key);
+  }
+
+  setMessage("Mood palette saved!");
+  setTimeout(() => setMessage(""), 600);
+};
+
 
   return (
-  <div className="w-full min-h-screen bg-gray-100 p-6 overflow-x-hidden">
+  <div className="h-full w-full min-h-screen bg-gray-100 py-1 px-2 overflow-x-hidden">
     {message && (
-      <div className="fixed top-4 right-4 bg-black text-white px-4 py-2 rounded shadow z-50">
+      <div className="fixed top-19 right-4 bg-opacity-50 bg-amber-400 text-orange-700 px-4 py-2 rounded shadow z-50">
         {message}
       </div>
     )}
 
-   <h1 className="text-3xl font-bold mb-6 text-center">Mood Palettes</h1>
+   <h1 className="text-2xl font-bold -mt-3 mb-1 text-center">Mood Palettes</h1>
 
 {/* Selector + icons in one row */}
-<div className="flex items-center gap-2 mb-6">
+<div className="flex items-center gap-2 mb-4">
   <select
-    className="flex-1 p-3 border rounded text-lg"
+    className="flex-1 py-2 px-3 border-b-slate-500 border-b bg-transparent text-md"
     value={selectedMood}
     onChange={(e) => setSelectedMood(e.target.value)}
   >
@@ -163,22 +169,20 @@ export default function MoodPalette() {
 
   <button
     onClick={generatePalette}
-    className="p-2 bg-white rounded shadow hover:bg-gray-50"
+    className="bg-none  "
     title="Regenerate Palette"
   >
     🔄
   </button>
   <button
     onClick={savePalette}
-    className="p-2 bg-white rounded shadow hover:bg-gray-50"
+    className=" bg-none"
     title="Save Palette"
   >
     💾
   </button>
 </div>
-<p className="mb-4 text-center text-sm text-gray-500 italic">
-  Press <kbd className="px-1 py-0.5 bg-gray-200 rounded">Enter</kbd> to generate a new palette
-</p>
+
 {/* Palette grid */}
 <div className="grid grid-cols-4 grid-rows-2 gap-2 mb-4 h-[60vh]">
   {currentPalette.map((tile, i) => (
@@ -198,12 +202,9 @@ export default function MoodPalette() {
     </div>
   ))}
 </div>
-
-
-
-    <p className="mt-4 text-center text-gray-600 italic">
-      Tweaking is disabled.
-    </p>
+ <p className="mb-4 text-center text-sm text-gray-500 italic">
+  Press <kbd className="px-1 py-0.5 bg-gray-200 rounded">Enter</kbd> to generate a new palette
+</p>
   </div>
 );
 

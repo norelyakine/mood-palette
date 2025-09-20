@@ -1,7 +1,32 @@
-// src/firebaseSetup.js
-import { rtdb } from "./firebase"; // your RTDB instance
-import { ref, get, set, child } from "firebase/database";
+import { rtdb, auth } from "./firebase"; 
+import { ref, get, set, push, child } from "firebase/database";
 
+export const addPaletteToCollection = async (collectionId, paletteId) => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const paletteIdsRef = ref(rtdb, `users/${user.uid}/collections/${collectionId}/paletteIds`);
+  const snapshot = await get(paletteIdsRef);
+  const current = snapshot.exists() ? snapshot.val() : [];
+
+  await set(paletteIdsRef, [...current, paletteId]);
+};
+export const createCollection = async (name) => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const collectionsRef = ref(rtdb, `users/${user.uid}/collections`);
+  const newRef = push(collectionsRef);
+
+  await set(newRef, {
+    id: newRef.key,
+    name,
+    createdAt: Date.now(),
+    paletteIds: [],
+  });
+
+  return newRef.key;
+};
 export const setupUsernameGenerator = async () => {
   const dbRef = ref(rtdb);
 

@@ -1,15 +1,16 @@
-import React from "react";
+import { useNavigate } from "react-router-dom";
 
-export default function Landing({ username, onSelectMode }) {
+export default function Landing({ username }) {
+  const navigate = useNavigate();
+
   return (
-    <div className="flex flex-col items-center justify-center mt-10 px-6">
+    <div className="h-full flex flex-col items-center justify-center px-6">
       <h1 className="text-3xl font-bold mb-2">Welcome, {username}!</h1>
       <p className="text-gray-600 text-lg mb-8">How do you want to explore color today?</p>
 
       <div className="flex flex-col md:flex-row gap-6">
-        {/* Harmony Mode Card */}
         <div
-          onClick={() => onSelectMode("harmony")}
+          onClick={() => navigate("/harmony")}
           className="cursor-pointer bg-white shadow-md rounded-lg p-6 w-80 hover:shadow-xl transition"
         >
           <h2 className="text-xl font-semibold mb-2">Play with Color Harmony</h2>
@@ -18,9 +19,8 @@ export default function Landing({ username, onSelectMode }) {
           </p>
         </div>
 
-        {/* Mood Mode Card */}
         <div
-          onClick={() => onSelectMode("mood")}
+          onClick={() => navigate("/mood")}
           className="cursor-pointer bg-white shadow-md rounded-lg p-6 w-80 hover:shadow-xl transition"
         >
           <h2 className="text-xl font-semibold mb-2">Design by Emotion</h2>

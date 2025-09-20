@@ -68,7 +68,7 @@ const assignUsername = async (uid) => {
   };
 
   return (
-    <div className="p-6 max-w-sm mx-auto mt-20 bg-white rounded shadow">
+    <div className="h-full p-6 max-w-sm mx-auto mt-20 bg-white rounded shadow">
       <h1 className="text-xl font-bold mb-4">{isRegister ? "Register" : "Login"}</h1>
       <form onSubmit={handleSubmit}>
         <input

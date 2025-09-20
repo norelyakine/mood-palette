@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { auth } from "./firebase";
+import { auth, rtdb } from "./firebase";
+import { ref, get } from "firebase/database";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import { setupUsernameGenerator } from "./firebaseSetUp";
@@ -16,15 +17,28 @@ export default function App() {
   const [paletteMode, setPaletteMode] = useState(null);
 
   useEffect(() => {
-    const init = async () => {
-      await setupUsernameGenerator();
-      onAuthStateChanged(auth, (firebaseUser) => {
+  const init = async () => {
+    await setupUsernameGenerator();
+
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
         setUser(firebaseUser);
-        setLoading(false);
-      });
-    };
-    init();
-  }, []);
+
+        // Fetch username from DB
+        const userRef = ref(rtdb, `users/${firebaseUser.uid}/username`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          setUsername(snapshot.val());
+        }
+      } else {
+        setUser(null);
+        setUsername("");
+      }
+      setLoading(false);
+    });
+  };
+  init();
+}, []);
 
   if (loading) return <p>Loading...</p>;
 
@@ -38,58 +52,53 @@ export default function App() {
       />
     );
 
-  return (
-    <Router>
-      <div className="min-h-screen flex flex-col bg-gray-100 w-full">
-        {/* Navbar */}
-        <div className="flex justify-between items-center px-6 py-4 bg-white shadow">
-          {/* Left side links */}
-          <div className="flex gap-4">
-            <Link
-              to="/"
-              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Mood Palette
-            </Link>
-          </div>
-
-          {/* Right side links + logout */}
-          <div className="flex items-center gap-4">
-            <Link
-              to="/mypalettes"
-              className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-            >
-              My Palettes
-            </Link>
-            <button
-              onClick={() => signOut(auth)}
-              className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-            >
-              Logout
-            </button>
-          </div>
+ return (
+  <Router>
+    <div className="h-screen flex flex-col bg-gray-100 w-full">
+      {/* Navbar */}
+      <div className="flex justify-between items-center px-6 py-3 bg-white shadow">
+        {/* Left side links */}
+        <div className="flex gap-4">
+          <Link
+            to="/"
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            PLT
+          </Link>
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 p-6 overflow-auto">
-          <Routes>
-            <Route
-              path="/"
-              element={
-                paletteMode === null ? (
-                  <Landing username={username} onSelectMode={setPaletteMode} />
-                ) : paletteMode === "mood" ? (
-                  <MoodPalette />
-                ) : (
-                  <HarmonyPalette />
-                )
-              }
-            />
-            <Route path="/mypalettes" element={<MyPalettes />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+        {/* Right side links + logout */}
+        <div className="flex items-center gap-4">
+          <Link
+            to="/mypalettes"
+            className="px-3 py-1 text-gray-800 rounded hover:text-gray-700"
+          >
+            My Palettes
+          </Link>
+          <button
+            onClick={() => signOut(auth)}
+            className="text-gray-800 px-3 py-1 rounded hover:text-gray-700"
+          >
+            Logout
+          </button>
         </div>
       </div>
-    </Router>
-  );
+
+      {/* Main content */}
+      <div className="flex-1 p-6 overflow-hidden">
+        <Routes>
+          <Route
+            path="/"
+            element={<Landing username={username} onSelectMode={setPaletteMode} />}
+          />
+          <Route path="/mood" element={<MoodPalette />} />
+          <Route path="/harmony" element={<HarmonyPalette />} />
+          <Route path="/mypalettes" element={<MyPalettes />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </div>
+  </Router>
+);
+
 }
