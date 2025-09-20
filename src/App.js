@@ -9,6 +9,7 @@ import Login from "./components/Login";
 import MoodPalette from "./components/MoodPalette";
 import HarmonyPalette from "./components/HarmonyPalette";
 import MyPalettes from "./components/MyPalettes";
+import { Toaster } from "react-hot-toast";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -54,6 +55,7 @@ export default function App() {
 
  return (
   <Router>
+      <Toaster position="bottom-center" />
     <div className="h-screen flex flex-col bg-gray-100 w-full">
       {/* Navbar */}
       <div className="flex justify-between items-center px-6 py-3 bg-white shadow">
@@ -85,7 +87,7 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 p-6 overflow-hidden">
+      <div className="flex-1 py-6 overflow-hidden">
         <Routes>
           <Route
             path="/"

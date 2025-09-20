@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { rtdb } from "../firebase";
-import { ref, push, set } from "firebase/database";
+import { ref, get, child, push, set } from "firebase/database";
 import { auth } from "../firebase";
-import {addPaletteToCollection} from "../firebaseSetUp";
+import {addPaletteToCollection, createCollection} from "../firebaseSetUp";
 import layoutTemplates from "../utils/layoutTemplates";
 
 const MOOD_CONFIG = {
@@ -78,11 +78,16 @@ const normalizeLayoutItem = (item) => {
 const getGridClasses = ({ colStart, rowStart, colSpan, rowSpan }) =>
   [`col-start-${colStart}`, `row-start-${rowStart}`, `col-span-${colSpan}`, `row-span-${rowSpan}`].join(" ");
 
+
+
 export default function MoodPalette() {
   const [selectedMood, setSelectedMood] = useState("Calm");
   const [currentPalette, setCurrentPalette] = useState([]);
   const [message, setMessage] = useState("");
   const [paletteKey, setPaletteKey] = useState(0);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [collections, setCollections] = useState({});
+  const [newCollectionName, setNewCollectionName] = useState("");
 
   const moods = Object.keys(MOOD_CONFIG);
 
@@ -100,7 +105,13 @@ export default function MoodPalette() {
     setCurrentPalette(newPalette);
     setPaletteKey((k) => k + 1);
   };
-
+const openSaveModal = async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+  const snap = await get(child(ref(rtdb), `users/${user.uid}/collections`));
+  setCollections(snap.exists() ? snap.val() : {});
+  setShowSaveModal(true);
+};
   useEffect(generatePalette, [selectedMood]);
 
   useEffect(() => {
@@ -144,6 +155,7 @@ export default function MoodPalette() {
 
 
   return (
+    <>
   <div className="h-full w-full min-h-screen bg-gray-100 py-1 px-2 overflow-x-hidden">
     {message && (
       <div className="fixed top-19 right-4 bg-opacity-50 bg-amber-400 text-orange-700 px-4 py-2 rounded shadow z-50">
@@ -174,13 +186,14 @@ export default function MoodPalette() {
   >
     🔄
   </button>
-  <button
-    onClick={savePalette}
-    className=" bg-none"
+    <button
+    onClick={openSaveModal}
+    className="bg-none"
     title="Save Palette"
   >
     💾
   </button>
+
 </div>
 
 {/* Palette grid */}
@@ -206,6 +219,88 @@ export default function MoodPalette() {
   Press <kbd className="px-1 py-0.5 bg-gray-200 rounded">Enter</kbd> to generate a new palette
 </p>
   </div>
+
+  {showSaveModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-4">
+      <h3 className="text-lg font-bold mb-3">Save Palette</h3>
+
+      {/* Existing collections */}
+      {Object.keys(collections).length > 0 ? (
+        <div className="space-y-2 mb-4">
+          {Object.entries(collections).map(([id, col]) => (
+            <button
+              key={id}
+              onClick={async () => {
+                const user = auth.currentUser;
+                const pRef = ref(rtdb, `users/${user.uid}/palettes`);
+                const newRef = push(pRef);
+                await set(newRef, {
+                  type: "mood",
+                  mood: selectedMood,
+                  colors: currentPalette.map((c) => c.color),
+                  createdAt: Date.now(),
+                });
+                await addPaletteToCollection(id, newRef.key);
+                setShowSaveModal(false);
+                setMessage(`Saved to ${col.name}`);
+                setTimeout(() => setMessage(""), 1500);
+              }}
+              className="w-full text-left px-3 py-2 rounded border hover:bg-gray-100"
+            >
+              {col.name}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500 mb-4">No collections yet.</p>
+      )}
+
+      {/* Create new collection */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newCollectionName}
+          onChange={(e) => setNewCollectionName(e.target.value)}
+          placeholder="New collection name"
+          className="flex-1 border rounded px-2 py-1"
+        />
+        <button
+          onClick={async () => {
+            if (!newCollectionName.trim()) return;
+            const id = await createCollection(newCollectionName.trim());
+            const user = auth.currentUser;
+            const pRef = ref(rtdb, `users/${user.uid}/palettes`);
+            const newRef = push(pRef);
+            await set(newRef, {
+              type: "mood",
+              mood: selectedMood,
+              colors: currentPalette.map((c) => c.color),
+              createdAt: Date.now(),
+            });
+            await addPaletteToCollection(id, newRef.key);
+            setShowSaveModal(false);
+            setNewCollectionName("");
+            setMessage("Palette saved to new collection!");
+            setTimeout(() => setMessage(""), 1500);
+          }}
+          className="px-3 py-1 bg-blue-500 text-white rounded"
+        >
+          Create & Save
+        </button>
+      </div>
+
+      <button
+        onClick={() => setShowSaveModal(false)}
+        className="mt-4 text-sm text-gray-500 hover:text-gray-700"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+
+</>
 );
 
 }

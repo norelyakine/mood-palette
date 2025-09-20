@@ -1,11 +1,9 @@
-// src/firebase.js
-
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database"; 
 import { getAuth } from "firebase/auth";
 
-// Your Firebase config
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyAmUpkzypD5tMwl6gDMMgVBljyjkam0odY",
   authDomain: "mood-palette-pj.firebaseapp.com",

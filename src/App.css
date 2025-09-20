@@ -27,6 +27,45 @@
 .App-link {
   color: #61dafb;
 }
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+.scroll-hidden {
+  -ms-overflow-style: none;  
+  scrollbar-width: none;     
+}
+
+/* Responsive carousel utilities: 1/2/3 visible cards with gap compensation */
+.carousel {
+  --gap: 24px;          
+  --cols: 1;            /* default: mobile = 1 */
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 640px) { /* sm: tablet */
+  .carousel { --cols: 2; }
+}
+@media (min-width: 1024px) { /* lg: desktop */
+  .carousel { --cols: 3; }
+}
+
+/* Hide scrollbar */
+.carousel::-webkit-scrollbar { display: none; }
+.carousel { scrollbar-width: none; -ms-overflow-style: none; }
+
+.carousel-track {
+  display: flex;
+  gap: var(--gap);
+  padding-inline: 4px; 
+}
+
+.carousel-card {
+  flex: 0 0 calc((100% - var(--gap) * (var(--cols) - 1)) / var(--cols));
+  scroll-snap-align: start;
+}
+
 
 @keyframes App-logo-spin {
   from {

@@ -10,7 +10,8 @@ import {
 import layoutTemplates from "../utils/layoutTemplates";
 import { HexColorPicker, HexColorInput } from "react-colorful";
 import { rtdb, auth } from "../firebase";
-import { ref, push, set } from "firebase/database";
+import { ref, push, get, child, set } from "firebase/database";
+import {addPaletteToCollection, createCollection} from "../firebaseSetUp";
 
 export default function HarmonyPalette() {
   const [palette, setPalette] = useState([]);
@@ -23,6 +24,10 @@ export default function HarmonyPalette() {
   const lockedRef = useRef(locked);
   const paletteRef = useRef(palette);
   const hueMapRef = useRef(hueMap);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [collections, setCollections] = useState({});
+  const [newCollectionName, setNewCollectionName] = useState("");
+
 
   useEffect(() => { lockedRef.current = locked; }, [locked]);
   useEffect(() => { paletteRef.current = palette; }, [palette]);
@@ -88,6 +93,13 @@ export default function HarmonyPalette() {
   setActivePicker(null);
   setCopiedIndex(null);
 }, []);
+const openSaveModal = async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+  const snap = await get(child(ref(rtdb), `users/${user.uid}/collections`));
+  setCollections(snap.exists() ? snap.val() : {});
+  setShowSaveModal(true);
+};
 
 const savePalette = () => {
   const user = auth.currentUser;
@@ -178,6 +190,7 @@ const savePalette = () => {
   }, [generatePalette]);
 
   return (
+    <>
     <div className="h-full px-6 relative">
       <h1 className="text-2xl font-bold text-center mb-3 ">Harmony Mode</h1>
         {message && (
@@ -204,12 +217,13 @@ const savePalette = () => {
           🔄
         </button>
         <button
-            onClick={savePalette}
-            className="text-xl text-gray-700 hover:text-black transition"
-            title="Save Palette"
+        onClick={openSaveModal}
+        className="text-xl text-gray-700 hover:text-black transition"
+        title="Save Palette"
         >
-            💾
+        💾
         </button>
+
       </div>
 
    
@@ -315,5 +329,84 @@ const savePalette = () => {
           : "Harmony: Unclassified"}
       </div>
     </div>
+
+    {showSaveModal && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-4">
+        <h3 className="text-lg font-bold mb-3">Save Palette</h3>
+
+        {/* Existing collections */}
+        {Object.keys(collections).length > 0 ? (
+          <div className="space-y-2 mb-4">
+            {Object.entries(collections).map(([id, col]) => (
+              <button
+                key={id}
+                onClick={async () => {
+                  const user = auth.currentUser;
+                  const pRef = ref(rtdb, `users/${user.uid}/palettes`);
+                  const newRef = push(pRef);
+                  await set(newRef, {
+                    type: "harmony",
+                    colors: palette.map((c) => c.color),
+                    createdAt: Date.now(),
+                  });
+                  await addPaletteToCollection(id, newRef.key);
+                  setShowSaveModal(false);
+                  setMessage(`Saved to ${col.name}`);
+                  setTimeout(() => setMessage(""), 1500);
+                }}
+                className="w-full text-left px-3 py-2 rounded border hover:bg-gray-100"
+              >
+                {col.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 mb-4">No collections yet.</p>
+        )}
+
+        {/* Create new collection */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newCollectionName}
+            onChange={(e) => setNewCollectionName(e.target.value)}
+            placeholder="New collection name"
+            className="flex-1 border rounded px-2 py-1"
+          />
+          <button
+            onClick={async () => {
+              if (!newCollectionName.trim()) return;
+              const id = await createCollection(newCollectionName.trim());
+              const user = auth.currentUser;
+              const pRef = ref(rtdb, `users/${user.uid}/palettes`);
+              const newRef = push(pRef);
+              await set(newRef, {
+                type: "harmony",
+                colors: palette.map((c) => c.color),
+                createdAt: Date.now(),
+              });
+              await addPaletteToCollection(id, newRef.key);
+              setShowSaveModal(false);
+              setNewCollectionName("");
+              setMessage("Palette saved to new collection!");
+              setTimeout(() => setMessage(""), 1500);
+            }}
+            className="px-3 py-1 bg-blue-500 text-white rounded"
+          >
+            Create & Save
+          </button>
+        </div>
+
+        <button
+          onClick={() => setShowSaveModal(false)}
+          className="mt-4 text-sm text-gray-500 hover:text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )}
+</>
   );
 }

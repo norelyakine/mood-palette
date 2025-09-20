@@ -1,5 +1,5 @@
 import { rtdb, auth } from "./firebase"; 
-import { ref, get, set, push, child } from "firebase/database";
+import { ref, get, remove, set, push, child } from "firebase/database";
 
 export const addPaletteToCollection = async (collectionId, paletteId) => {
   const user = auth.currentUser;
@@ -27,6 +27,16 @@ export const createCollection = async (name) => {
 
   return newRef.key;
 };
+export async function deleteCollection(id) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  await remove(ref(rtdb, `users/${user.uid}/collections/${id}`));
+}
+export async function deletePalette(id) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  await remove(ref(rtdb, `users/${user.uid}/palettes/${id}`));
+}
 export const setupUsernameGenerator = async () => {
   const dbRef = ref(rtdb);
 
